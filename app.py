@@ -6,6 +6,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain.chains import RetrievalQA
 
+
 st.set_page_config(page_title="My Chatbot", page_icon="💬")
 import streamlit.components.v1 as components
 
