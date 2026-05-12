@@ -7,6 +7,25 @@ from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain.chains import RetrievalQA
 
 st.set_page_config(page_title="My Chatbot", page_icon="💬")
+import streamlit.components.v1 as components
+
+COMETCHAT_APP_ID = st.secrets["COMETCHAT_APP_ID"]
+COMETCHAT_REGION = st.secrets["COMETCHAT_REGION"]  # e.g. "us"
+COMETCHAT_AUTH_KEY = st.secrets["COMETCHAT_AUTH_KEY"]
+
+components.html(f"""
+<div id="cometchat-widget"></div>
+<script src="https://widget-js.cometchat.io/v3/widgetjs/cometchat-widget.js"></script>
+<script>
+  window.CometChatWidget.init({{
+    "appID": "{COMETCHAT_APP_ID}",
+    "appRegion": "{COMETCHAT_REGION}",
+    "authKey": "{COMETCHAT_AUTH_KEY}"
+  }}).then(() => {{
+    window.CometChatWidget.launch({{ widgetID: "default" }});
+  }});
+</script>
+""", height=600)
 st.title("💬 My Knowledge Chatbot")
 
 # --- Load API key from Streamlit secrets ---
