@@ -1,77 +1,76 @@
 import streamlit as st
-import os
-from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import FAISS
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from langchain.chains import RetrievalQA
-
-
-st.set_page_config(page_title="My Chatbot", page_icon="💬")
 import streamlit.components.v1 as components
 
-COMETCHAT_APP_ID = st.secrets["COMETCHAT_APP_ID"]
-COMETCHAT_REGION = st.secrets["COMETCHAT_REGION"]  # e.g. "us"
-COMETCHAT_AUTH_KEY = st.secrets["COMETCHAT_AUTH_KEY"]
-
-components.html(f"""
-<div id="cometchat-widget"></div>
-<script src="https://widget-js.cometchat.io/v3/widgetjs/cometchat-widget.js"></script>
-<script>
-  window.CometChatWidget.init({{
-    "appID": "{COMETCHAT_APP_ID}",
-    "appRegion": "{COMETCHAT_REGION}",
-    "authKey": "{COMETCHAT_AUTH_KEY}"
-  }}).then(() => {{
-    window.CometChatWidget.launch({{ widgetID: "default" }});
-  }});
-</script>
-""", height=600)
+st.set_page_config(page_title="My Chatbot", page_icon="💬", layout="wide")
 st.title("💬 My Knowledge Chatbot")
 
-# --- Load API key from Streamlit secrets ---
-openai_api_key = st.secrets["OPENAI_API_KEY"]
+# Load CometChat credentials from Streamlit secrets
+app_id = st.secrets["COMETCHAT_APP_ID"]
+auth_key = st.secrets["COMETCHAT_AUTH_KEY"]
+region = st.secrets["COMETCHAT_REGION"]
 
-# --- Load and index your documents ---
-@st.cache_resource
-def load_knowledge_base():
-    docs = []
-    docs_folder = "docs"
-    for filename in os.listdir(docs_folder):
-        filepath = os.path.join(docs_folder, filename)
-        if filename.endswith(".pdf"):
-            loader = PyPDFLoader(filepath)
-            docs.extend(loader.load())
-        elif filename.endswith(".docx"):
-            loader = Docx2txtLoader(filepath)
-            docs.extend(loader.load())
-    
-    splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-    chunks = splitter.split_documents(docs)
-    embeddings = OpenAIEmbeddings(api_key=openai_api_key)
-    vectorstore = FAISS.from_documents(chunks, embeddings)
-    return vectorstore
+# A simple user login — in production you'd use real user IDs
+user_id = "streamlit_user"
+user_name = "Guest User"
 
-vectorstore = load_knowledge_base()
-llm = ChatOpenAI(api_key=openai_api_key, model="gpt-3.5-turbo")
-qa_chain = RetrievalQA.from_chain_type(llm=llm, retriever=vectorstore.as_retriever())
+cometchat_html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {{ margin: 0; padding: 0; }}
+    #cometchat-app {{
+      width: 100%;
+      height: 600px;
+      border-radius: 12px;
+      overflow: hidden;
+    }}
+  </style>
+</head>
+<body>
+  <div id="cometchat-app"></div>
 
-# --- Chat UI ---
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+  <script src="https://unpkg.com/@cometchat/chat-uikit-javascript@4.0.0/CometChatUIKit/CometChatUIKit.js"></script>
 
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.write(msg["content"])
+  <script>
+    const appSetting = new CometChatUIKit.UIKitSettingsBuilder()
+      .setAppId("{app_id}")
+      .setRegion("{region}")
+      .setAuthKey("{auth_key}")
+      .subscribePresenceForAllUsers()
+      .build();
 
-if prompt := st.chat_input("Ask me anything about your documents..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.write(prompt)
-    
-    with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            response = qa_chain.run(prompt)
-            st.write(response)
-    
-    st.session_state.messages.append({"role": "assistant", "content": response})
+    CometChatUIKit.init(appSetting).then(() => {{
+      // Log in the user
+      CometChatUIKit.getLoggedinUser().then(user => {{
+        if (!user) {{
+          const newUser = new CometChat.User("{user_id}");
+          newUser.setName("{user_name}");
+          CometChatUIKit.createUser(newUser, "{auth_key}").then(createdUser => {{
+            return CometChatUIKit.login(createdUser);
+          }}).catch(() => {{
+            // User may already exist, try logging in directly
+            return CometChatUIKit.login("{user_id}", "{auth_key}");
+          }}).then(() => {{
+            launchChat();
+          }});
+        }} else {{
+          launchChat();
+        }}
+      }});
+    }}).catch(err => {{
+      document.getElementById("cometchat-app").innerHTML =
+        "<p style='color:red;padding:20px'>CometChat init failed: " + err + "</p>";
+    }});
+
+    function launchChat() {{
+      const chatContainer = document.getElementById("cometchat-app");
+      // Launch CometChat's built-in UI
+      new CometChatUI().init(chatContainer);
+    }}
+  </script>
+</body>
+</html>
+"""
+
+components.html(cometchat_html, height=640, scrolling=False)
