@@ -6,6 +6,3 @@ langchain-openai
 faiss-cpu
 pypdf
 python-docx
-cometchatwq
-
-
